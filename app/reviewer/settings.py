@@ -13,6 +13,13 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 import os
 from pathlib import Path
 
+# Use PyMySQL as MySQL adapter for Django
+try:
+    import pymysql
+    pymysql.install_as_MySQLdb()
+except ImportError:
+    pass  # PyMySQL not installed, SQLite will be used
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -27,9 +34,12 @@ SECRET_KEY = os.getenv(
 )
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv("DEBUG", "True").lower() in ("true", "1", "yes")
 
-ALLOWED_HOSTS: list[str] = ["*"]
+# ALLOWED_HOSTS configuration
+# Default to "*" for development, but should be set explicitly in production
+ALLOWED_HOSTS_STR = os.getenv("ALLOWED_HOSTS", "*")
+ALLOWED_HOSTS: list[str] = [host.strip() for host in ALLOWED_HOSTS_STR.split(",")]
 
 
 # Application definition
@@ -47,6 +57,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "csp.middleware.CSPMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -79,12 +91,34 @@ WSGI_APPLICATION = "reviewer.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+# Check if running on Toolforge
+TOOLFORGE_DEPLOYMENT = os.getenv("TOOLFORGE_DEPLOYMENT", "false").lower() in ("true", "1", "yes")
+
+if TOOLFORGE_DEPLOYMENT:
+    # Toolforge production database (MariaDB)
+    db_name = os.environ.get("TOOLSDB_NAME", "s57230__pendingchangesbot")
+
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.mysql",
+            "NAME": db_name,
+            "HOST": "tools.db.svc.wikimedia.cloud",
+            "PORT": "3306",
+            "OPTIONS": {
+                "read_default_file": os.path.expanduser("~/replica.my.cnf"),
+                "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+                "charset": "utf8mb4",
+            },
+        }
     }
-}
+else:
+    # Local development database (SQLite)
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 
 # Password validation
@@ -123,6 +157,41 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
+
+# Static files collection for production
+STATIC_ROOT = os.getenv("STATIC_ROOT", BASE_DIR / "staticfiles")
+
+# WhiteNoise configuration for efficient static file serving
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+# Content Security Policy - Allow external CDNs for scripts and styles
+CSP_DEFAULT_SRC = ("'self'",)
+CSP_SCRIPT_SRC = (
+    "'self'",
+    "'unsafe-inline'",
+    "'unsafe-eval'",  # Required for Vue.js
+    "https://unpkg.com",
+    "https://cdn.jsdelivr.net",
+    "*.toolforge.org",
+    "*.wikimedia.org",
+    "*.wikipedia.org",
+)
+CSP_STYLE_SRC = (
+    "'self'",
+    "'unsafe-inline'",
+    "https://cdnjs.cloudflare.com",
+    "*.toolforge.org",
+    "*.wikimedia.org",
+    "*.wikipedia.org",
+)
+CSP_CONNECT_SRC = (
+    "'self'",
+    "*.toolforge.org",
+    "*.wikimedia.org",
+    "*.wikipedia.org",
+)
+CSP_IMG_SRC = ("'self'", "data:", "https:", "*.wikimedia.org", "*.wikipedia.org")
+CSP_FONT_SRC = ("'self'", "data:", "https://cdnjs.cloudflare.com")
 
 PYWIKIBOT_SITE_FAMILY = os.getenv("PYWIKIBOT_SITE_FAMILY", "wikipedia")
 
