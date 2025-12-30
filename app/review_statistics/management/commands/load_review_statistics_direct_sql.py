@@ -96,19 +96,26 @@ class Command(BaseCommand):
             saved_count = 0
             skipped_count = 0
             max_log_id = min_log_id or 0
+            skip_reasons = {}
 
             with transaction.atomic():
-                for entry in payload:
+                for i, entry in enumerate(payload):
                     try:
                         log_id = entry.get("log_id")
                         if log_id:
                             max_log_id = max(max_log_id, log_id)
+
+                        # Debug first record
+                        if i == 0:
+                            self.stdout.write(f"  First record sample: {entry}")
 
                         # Parse timestamps
                         reviewed_timestamp_str = entry.get("reviewed_timestamp")
                         pending_timestamp_str = entry.get("pending_timestamp")
 
                         if not reviewed_timestamp_str or not pending_timestamp_str:
+                            reason = "missing_timestamps"
+                            skip_reasons[reason] = skip_reasons.get(reason, 0) + 1
                             skipped_count += 1
                             continue
 
@@ -116,7 +123,13 @@ class Command(BaseCommand):
                         pending_timestamp = self._parse_timestamp(pending_timestamp_str)
 
                         if not reviewed_timestamp or not pending_timestamp:
+                            reason = "invalid_timestamp_format"
+                            skip_reasons[reason] = skip_reasons.get(reason, 0) + 1
                             skipped_count += 1
+                            if i < 5:  # Show first few errors
+                                self.stdout.write(
+                                    f"  Timestamp parse error: reviewed={reviewed_timestamp_str}, pending={pending_timestamp_str}"
+                                )
                             continue
 
                         # Create or update record
@@ -137,7 +150,10 @@ class Command(BaseCommand):
                         saved_count += 1
 
                     except Exception as e:
-                        logger.warning(f"Failed to process entry: {e}")
+                        reason = f"exception: {type(e).__name__}"
+                        skip_reasons[reason] = skip_reasons.get(reason, 0) + 1
+                        if i < 5:  # Show first few exceptions
+                            logger.warning(f"Failed to process entry: {e}")
                         skipped_count += 1
                         continue
 
@@ -155,6 +171,12 @@ class Command(BaseCommand):
                     metadata.newest_review_timestamp = newest.reviewed_timestamp
 
                 metadata.save()
+
+            # Show skip reasons
+            if skip_reasons:
+                self.stdout.write("  Skip reasons:")
+                for reason, count in skip_reasons.items():
+                    self.stdout.write(f"    - {reason}: {count}")
 
             self.stdout.write(
                 self.style.SUCCESS(
@@ -178,14 +200,24 @@ class Command(BaseCommand):
             logger.exception(f"Failed to load statistics for {wiki.code}")
             raise
 
-    def _parse_timestamp(self, timestamp_str: str) -> datetime | None:
+    def _parse_timestamp(self, timestamp_value) -> datetime | None:
         """Parse MediaWiki timestamp format (YYYYMMDDHHMMSS)."""
-        if not timestamp_str:
+        if timestamp_value is None:
             return None
         try:
-            timestamp_str = str(timestamp_str)
+            # Handle both string and integer formats
+            if isinstance(timestamp_value, bytes):
+                timestamp_str = timestamp_value.decode('utf-8')
+            else:
+                timestamp_str = str(timestamp_value)
+
+            # Remove any whitespace
+            timestamp_str = timestamp_str.strip()
+
             if len(timestamp_str) == 14:
                 return datetime.strptime(timestamp_str, "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
-        except (ValueError, TypeError):
-            logger.warning(f"Invalid timestamp format: {timestamp_str}")
+            else:
+                logger.warning(f"Invalid timestamp length ({len(timestamp_str)}): {timestamp_str}")
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Invalid timestamp format: {timestamp_value} - {e}")
         return None
