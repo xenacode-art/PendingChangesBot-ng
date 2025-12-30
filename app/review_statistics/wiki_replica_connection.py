@@ -44,7 +44,10 @@ class WikiReplicaConnection:
         Returns:
             Database name with _p suffix (e.g., 'fiwiki_p')
         """
-        return f"{self.wiki.code}_p"
+        # Construct database name: code + family_short + _p
+        # e.g., "fi" + "wiki" (from "wikipedia") + "_p" = "fiwiki_p"
+        family_short = "wiki" if self.wiki.family == "wikipedia" else self.wiki.family
+        return f"{self.wiki.code}{family_short}_p"
 
     def get_host(self) -> str:
         """
@@ -53,7 +56,10 @@ class WikiReplicaConnection:
         Returns:
             Host DNS name (e.g., 'fiwiki.analytics.db.svc.wikimedia.cloud')
         """
-        return f"{self.wiki.code}.analytics.db.svc.wikimedia.cloud"
+        # Construct hostname: code + family_short + .analytics.db.svc.wikimedia.cloud
+        # e.g., "fi" + "wiki" = "fiwiki.analytics.db.svc.wikimedia.cloud"
+        family_short = "wiki" if self.wiki.family == "wikipedia" else self.wiki.family
+        return f"{self.wiki.code}{family_short}.analytics.db.svc.wikimedia.cloud"
 
     @contextmanager
     def get_connection(self):
