@@ -96,7 +96,7 @@ TOOLFORGE_DEPLOYMENT = os.getenv("TOOLFORGE_DEPLOYMENT", "false").lower() in ("t
 
 if TOOLFORGE_DEPLOYMENT:
     # Toolforge production database (MariaDB)
-    db_name = os.environ.get("TOOLSDB_NAME", "s57230__pendingchangesbot")
+    db_name = os.environ.get("TOOLSDB_NAME", "s57224__pendingchangesbot")
 
     DATABASES = {
         "default": {
