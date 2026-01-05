@@ -7,6 +7,8 @@ projects using the Flagged Revisions API. It fetches the 50 oldest pending pages
 selected wiki, caches their pending revisions together with editor metadata, and exposes a
 Vue.js interface for reviewing the results.
 
+**✨ Now ready for Toolforge deployment!** See [TOOLFORGE_DEPLOYMENT.md](TOOLFORGE_DEPLOYMENT.md) for deployment instructions.
+
 ## Installation
 
 1. **Fork the repository**
@@ -190,6 +192,27 @@ Interactive API documentation is available via Swagger UI:
 - **ReDoc**: <http://127.0.0.1:8000/redoc/> - Alternative documentation view
 
 For detailed API documentation, see [docs/API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md).
+
+### Statistics
+
+The application includes statistics functionality that tracks FlaggedRevs data and reviewer activity using direct SQL access to wiki replica databases.
+
+**Features:**
+- Monthly aggregates (total pages, reviewed pages, pending lag)
+- Reviewer activity metrics
+- Individual review records with delay calculations
+- Interactive charts and visualizations
+
+**Loading Statistics:**
+```bash
+# Load FlaggedRevs statistics for Finnish Wikipedia
+TOOLFORGE_DEPLOYMENT=true python manage.py load_flaggedrevs_statistics_direct_sql --wiki fi
+
+# Load individual review records
+TOOLFORGE_DEPLOYMENT=true python manage.py load_review_statistics_direct_sql --wiki fi --limit 10000
+```
+
+For detailed documentation on the statistics implementation, see [docs/DIRECT_SQL_STATISTICS.md](docs/DIRECT_SQL_STATISTICS.md).
 
 ## Running unit tests
 
