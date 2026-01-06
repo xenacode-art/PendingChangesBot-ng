@@ -3,12 +3,11 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 from django.test import TestCase
-from reviews.models import Wiki
-
 from review_statistics.direct_sql_services import (
     DirectSQLStatisticsClient,
     get_direct_sql_client,
 )
+from reviews.models import Wiki
 
 
 class DirectSQLStatisticsClientTests(TestCase):
@@ -191,9 +190,7 @@ class DirectSQLStatisticsClientTests(TestCase):
         mock_get_connection.return_value = mock_connection_manager
 
         client = DirectSQLStatisticsClient(self.wiki)
-        client.fetch_review_statistics_from_logging(
-            limit=1000, min_timestamp="20240101000000"
-        )
+        client.fetch_review_statistics_from_logging(limit=1000, min_timestamp="20240101000000")
 
         # Verify SQL contains timestamp filter
         call_args = mock_connection_manager.execute_query.call_args[0][0]

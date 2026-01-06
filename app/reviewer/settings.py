@@ -16,6 +16,7 @@ from pathlib import Path
 # Use PyMySQL as MySQL adapter for Django
 try:
     import pymysql
+
     pymysql.install_as_MySQLdb()
 except ImportError:
     pass  # PyMySQL not installed, SQLite will be used

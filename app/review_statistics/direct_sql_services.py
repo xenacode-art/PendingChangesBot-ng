@@ -10,13 +10,12 @@ This replaces the Pywikibot SupersetQuery approach with direct SQL for better
 connection management in production.
 """
 
+# ruff: noqa: S608
+
 from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING, Any
-
-from django.db import transaction
-from django.utils import timezone as dj_timezone
 
 from .wiki_replica_connection import get_wiki_replica_connection
 
@@ -72,7 +71,7 @@ class DirectSQLStatisticsClient:
         if end_date_filter:
             date_filter += f" AND total_ns0.d <= {end_date_filter}"
 
-        sql_query = f"""
+        sql_query = f"""  # noqa: S608
 SELECT
     {resolution_group} as yearmonth,
     AVG(totalPages_ns0) AS totalPages_ns0_avg,
@@ -186,7 +185,7 @@ ORDER BY yearmonth
         if end_date_filter:
             date_filter = f"AND fr_timestamp <= {end_date_filter}"
 
-        sql_query = f"""
+        sql_query = f"""  # noqa: S608
 SELECT
     {resolution_group} as yearmonth,
     AVG(number_of_reviewers) AS number_of_reviewers_avg,
@@ -267,7 +266,7 @@ ORDER BY yearmonth
 
         where_clause = " AND ".join(where_clauses)
 
-        sql_query = f"""
+        sql_query = f"""  # noqa: S608
 SELECT
     l.log_id,
     l.log_page       AS page_id,

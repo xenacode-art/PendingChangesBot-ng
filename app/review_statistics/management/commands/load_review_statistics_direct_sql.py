@@ -78,7 +78,7 @@ class Command(BaseCommand):
             sql_client = get_direct_sql_client(wiki)
 
             # Fetch data using direct SQL
-            self.stdout.write(f"  Querying review statistics from logging table...")
+            self.stdout.write("  Querying review statistics from logging table...")
             if min_log_id:
                 self.stdout.write(f"  Continuing from log_id: {min_log_id}")
 
@@ -128,7 +128,9 @@ class Command(BaseCommand):
                             skipped_count += 1
                             if i < 5:  # Show first few errors
                                 self.stdout.write(
-                                    f"  Timestamp parse error: reviewed={reviewed_timestamp_str}, pending={pending_timestamp_str}"
+                                    f"  Timestamp error: "
+                                    f"rev={reviewed_timestamp_str}, "
+                                    f"pend={pending_timestamp_str}"
                                 )
                             continue
 
@@ -163,8 +165,16 @@ class Command(BaseCommand):
                 metadata.last_data_loaded_at = timezone.now()
 
                 # Update oldest/newest timestamps
-                oldest = ReviewStatisticsCache.objects.filter(wiki=wiki).order_by("reviewed_timestamp").first()
-                newest = ReviewStatisticsCache.objects.filter(wiki=wiki).order_by("-reviewed_timestamp").first()
+                oldest = (
+                    ReviewStatisticsCache.objects.filter(wiki=wiki)
+                    .order_by("reviewed_timestamp")
+                    .first()
+                )
+                newest = (
+                    ReviewStatisticsCache.objects.filter(wiki=wiki)
+                    .order_by("-reviewed_timestamp")
+                    .first()
+                )
                 if oldest:
                     metadata.oldest_review_timestamp = oldest.reviewed_timestamp
                 if newest:
@@ -207,7 +217,7 @@ class Command(BaseCommand):
         try:
             # Handle both string and integer formats
             if isinstance(timestamp_value, bytes):
-                timestamp_str = timestamp_value.decode('utf-8')
+                timestamp_str = timestamp_value.decode("utf-8")
             else:
                 timestamp_str = str(timestamp_value)
 

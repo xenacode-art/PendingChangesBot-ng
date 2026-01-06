@@ -34,7 +34,7 @@ def _parse_timestamp(timestamp_value) -> datetime | None:
     try:
         # Handle both string and integer formats
         if isinstance(timestamp_value, bytes):
-            timestamp_str = timestamp_value.decode('utf-8')
+            timestamp_str = timestamp_value.decode("utf-8")
         else:
             timestamp_str = str(timestamp_value)
 
@@ -376,20 +376,24 @@ def api_statistics_refresh(request: HttpRequest, pk: int) -> JsonResponse:
         )
 
         if not payload:
-            return JsonResponse({
-                "total_records": metadata.total_records,
-                "oldest_timestamp": (
-                    metadata.oldest_review_timestamp.isoformat()
-                    if metadata.oldest_review_timestamp else None
-                ),
-                "newest_timestamp": (
-                    metadata.newest_review_timestamp.isoformat()
-                    if metadata.newest_review_timestamp else None
-                ),
-                "is_incremental": True,
-                "batches_fetched": 0,
-                "batch_limit_reached": False,
-            })
+            return JsonResponse(
+                {
+                    "total_records": metadata.total_records,
+                    "oldest_timestamp": (
+                        metadata.oldest_review_timestamp.isoformat()
+                        if metadata.oldest_review_timestamp
+                        else None
+                    ),
+                    "newest_timestamp": (
+                        metadata.newest_review_timestamp.isoformat()
+                        if metadata.newest_review_timestamp
+                        else None
+                    ),
+                    "is_incremental": True,
+                    "batches_fetched": 0,
+                    "batch_limit_reached": False,
+                }
+            )
 
         saved_count = 0
         max_log_id = min_log_id or 0
@@ -441,8 +445,16 @@ def api_statistics_refresh(request: HttpRequest, pk: int) -> JsonResponse:
             metadata.last_data_loaded_at = timezone.now()
 
             # Update oldest/newest timestamps
-            oldest = ReviewStatisticsCache.objects.filter(wiki=wiki).order_by("reviewed_timestamp").first()
-            newest = ReviewStatisticsCache.objects.filter(wiki=wiki).order_by("-reviewed_timestamp").first()
+            oldest = (
+                ReviewStatisticsCache.objects.filter(wiki=wiki)
+                .order_by("reviewed_timestamp")
+                .first()
+            )
+            newest = (
+                ReviewStatisticsCache.objects.filter(wiki=wiki)
+                .order_by("-reviewed_timestamp")
+                .first()
+            )
             if oldest:
                 metadata.oldest_review_timestamp = oldest.reviewed_timestamp
             if newest:
@@ -450,20 +462,24 @@ def api_statistics_refresh(request: HttpRequest, pk: int) -> JsonResponse:
 
             metadata.save()
 
-        return JsonResponse({
-            "total_records": metadata.total_records,
-            "oldest_timestamp": (
-                metadata.oldest_review_timestamp.isoformat()
-                if metadata.oldest_review_timestamp else None
-            ),
-            "newest_timestamp": (
-                metadata.newest_review_timestamp.isoformat()
-                if metadata.newest_review_timestamp else None
-            ),
-            "is_incremental": True,
-            "batches_fetched": 1 if saved_count > 0 else 0,
-            "batch_limit_reached": saved_count >= limit,
-        })
+        return JsonResponse(
+            {
+                "total_records": metadata.total_records,
+                "oldest_timestamp": (
+                    metadata.oldest_review_timestamp.isoformat()
+                    if metadata.oldest_review_timestamp
+                    else None
+                ),
+                "newest_timestamp": (
+                    metadata.newest_review_timestamp.isoformat()
+                    if metadata.newest_review_timestamp
+                    else None
+                ),
+                "is_incremental": True,
+                "batches_fetched": 1 if saved_count > 0 else 0,
+                "batch_limit_reached": saved_count >= limit,
+            }
+        )
 
     except Exception as exc:
         logger.exception("Failed to refresh statistics for %s", wiki.code)

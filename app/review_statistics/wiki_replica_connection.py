@@ -1,12 +1,14 @@
 """
 Direct SQL connection management for wiki replica databases.
 
-This module implements Zache's recommended approach for connecting to wiki replicas:
+This module implements Zache's recommended approach:
 - Open connections using DNS names when needed (for refreshing data)
-- Close connections immediately after use to avoid exhausting connection pools
-- Each wiki database is on a specific server accessible via DNS (e.g., fiwiki.analytics.db.svc.wikimedia.cloud)
+- Close connections immediately after use to avoid exhausting pools
+- Each wiki database is on a specific server accessible via DNS
+  (e.g., fiwiki.analytics.db.svc.wikimedia.cloud)
 
-This approach avoids the problem of running out of connections when dealing with hundreds of wiki databases.
+This approach avoids running out of connections when dealing with
+hundreds of wiki databases.
 """
 
 from __future__ import annotations
@@ -142,9 +144,7 @@ class WikiReplicaConnection:
             finally:
                 cursor.close()
 
-    def execute_query_with_params(
-        self, sql: str, params: tuple | dict
-    ) -> list[dict[str, Any]]:
+    def execute_query_with_params(self, sql: str, params: tuple | dict) -> list[dict[str, Any]]:
         """
         Execute a parameterized SQL query and return results.
 

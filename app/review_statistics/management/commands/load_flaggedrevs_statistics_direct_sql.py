@@ -14,13 +14,14 @@ logger = logging.getLogger(__name__)
 
 """
 USAGE:
-    python manage.py load_flaggedrevs_statistics_direct_sql  # Incremental update (recommended)
-    python manage.py load_flaggedrevs_statistics_direct_sql --wiki fi  # Update specific wiki only
-    python manage.py load_flaggedrevs_statistics_direct_sql --full-refresh  # Delete and reload all data
-    python manage.py load_flaggedrevs_statistics_direct_sql --clear  # Clear all data without loading
+    python manage.py load_flaggedrevs_statistics_direct_sql  # Incremental
+    python manage.py load_flaggedrevs_statistics_direct_sql --wiki fi
+    python manage.py load_flaggedrevs_statistics_direct_sql --full-refresh
+    python manage.py load_flaggedrevs_statistics_direct_sql --clear
 
-This version uses DIRECT SQL access to wiki replica databases instead of Pywikibot SupersetQuery.
-Following Zache's recommendation: opens connections when needed, closes immediately after use.
+This version uses DIRECT SQL access to wiki replica databases.
+Following Zache's recommendation: opens connections when needed,
+closes immediately after use.
 """
 
 
@@ -31,7 +32,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--wiki",
             type=str,
-            help="Wiki code to load statistics for (e.g., fi). If not provided, loads for all wikis.",
+            help="Wiki code (e.g., fi). Loads all wikis if not provided.",
         )
         parser.add_argument(
             "--clear",

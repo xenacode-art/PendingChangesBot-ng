@@ -534,7 +534,9 @@ def api_enabled_checks(request: HttpRequest, pk: int) -> JsonResponse:
             configuration.enabled_checks = enabled_checks
             configuration.save(update_fields=["enabled_checks", "updated_at"])
 
-    all_check_ids = [cast(str, c["id"]) for c in sorted(AVAILABLE_CHECKS, key=lambda c: cast(int, c["priority"]))]
+    all_check_ids = [
+        cast(str, c["id"]) for c in sorted(AVAILABLE_CHECKS, key=lambda c: cast(int, c["priority"]))
+    ]
     enabled = configuration.enabled_checks if configuration.enabled_checks else all_check_ids
 
     return JsonResponse(

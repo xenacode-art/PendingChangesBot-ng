@@ -5,12 +5,11 @@ from unittest.mock import MagicMock, patch
 import pymysql
 import pytest
 from django.test import TestCase
-from reviews.models import Wiki
-
 from review_statistics.wiki_replica_connection import (
     WikiReplicaConnection,
     get_wiki_replica_connection,
 )
+from reviews.models import Wiki
 
 
 class WikiReplicaConnectionTests(TestCase):
@@ -78,7 +77,7 @@ class WikiReplicaConnectionTests(TestCase):
         mock_conn = MagicMock()
         mock_connect.return_value = mock_conn
 
-        with self.connection_manager.get_connection() as conn:
+        with self.connection_manager.get_connection():
             pass
 
         # Verify pymysql.connect was called with correct params
@@ -96,7 +95,7 @@ class WikiReplicaConnectionTests(TestCase):
         mock_connect.return_value = mock_conn
 
         with pytest.raises(ValueError):
-            with self.connection_manager.get_connection() as conn:
+            with self.connection_manager.get_connection():
                 raise ValueError("Test error")
 
         # Connection should still be closed
@@ -108,7 +107,7 @@ class WikiReplicaConnectionTests(TestCase):
         mock_connect.side_effect = pymysql.Error("Connection failed")
 
         with pytest.raises(pymysql.Error):
-            with self.connection_manager.get_connection() as conn:
+            with self.connection_manager.get_connection():
                 pass
 
     @patch("review_statistics.wiki_replica_connection.pymysql.connect")

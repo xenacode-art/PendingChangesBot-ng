@@ -6,14 +6,13 @@ from unittest.mock import MagicMock, patch
 
 from django.core.management import call_command
 from django.test import TestCase
-from reviews.models import Wiki
-
 from review_statistics.models import (
     FlaggedRevsStatistics,
     ReviewActivity,
     ReviewStatisticsCache,
     ReviewStatisticsMetadata,
 )
+from reviews.models import Wiki
 
 
 class LoadFlaggedRevsStatisticsDirectSQLCommandTests(TestCase):
@@ -28,7 +27,9 @@ class LoadFlaggedRevsStatisticsDirectSQLCommandTests(TestCase):
             api_endpoint="https://fi.wikipedia.org/w/api.php",
         )
 
-    @patch("review_statistics.management.commands.load_flaggedrevs_statistics_direct_sql.get_direct_sql_client")
+    @patch(
+        "review_statistics.management.commands.load_flaggedrevs_statistics_direct_sql.get_direct_sql_client"
+    )
     def test_load_statistics_success(self, mock_get_client):
         """Test successful statistics loading."""
         mock_client = MagicMock()
@@ -67,7 +68,9 @@ class LoadFlaggedRevsStatisticsDirectSQLCommandTests(TestCase):
         self.assertEqual(activity.wiki, self.wiki)
         self.assertEqual(activity.number_of_reviewers, 25)
 
-    @patch("review_statistics.management.commands.load_flaggedrevs_statistics_direct_sql.get_direct_sql_client")
+    @patch(
+        "review_statistics.management.commands.load_flaggedrevs_statistics_direct_sql.get_direct_sql_client"
+    )
     def test_load_statistics_with_full_refresh(self, mock_get_client):
         """Test full refresh mode."""
         # Create existing data
@@ -102,7 +105,9 @@ class LoadFlaggedRevsStatisticsDirectSQLCommandTests(TestCase):
         self.assertEqual(FlaggedRevsStatistics.objects.count(), 1)
         self.assertEqual(FlaggedRevsStatistics.objects.first().total_pages_ns0, 100000)
 
-    @patch("review_statistics.management.commands.load_flaggedrevs_statistics_direct_sql.get_direct_sql_client")
+    @patch(
+        "review_statistics.management.commands.load_flaggedrevs_statistics_direct_sql.get_direct_sql_client"
+    )
     def test_load_statistics_with_date_range(self, mock_get_client):
         """Test loading with custom date range."""
         mock_client = MagicMock()
@@ -125,7 +130,9 @@ class LoadFlaggedRevsStatisticsDirectSQLCommandTests(TestCase):
         self.assertEqual(call_kwargs["start_date_filter"], 20240101)
         self.assertEqual(call_kwargs["end_date_filter"], 20241231)
 
-    @patch("review_statistics.management.commands.load_flaggedrevs_statistics_direct_sql.get_direct_sql_client")
+    @patch(
+        "review_statistics.management.commands.load_flaggedrevs_statistics_direct_sql.get_direct_sql_client"
+    )
     def test_load_statistics_auto_continue(self, mock_get_client):
         """Test auto-continue from last available data."""
         # Create existing data for December 2023
@@ -149,7 +156,9 @@ class LoadFlaggedRevsStatisticsDirectSQLCommandTests(TestCase):
         # Just verify it didn't crash - auto-continue message is informational
         self.assertIn("Loading statistics for fi", output)
 
-    @patch("review_statistics.management.commands.load_flaggedrevs_statistics_direct_sql.get_direct_sql_client")
+    @patch(
+        "review_statistics.management.commands.load_flaggedrevs_statistics_direct_sql.get_direct_sql_client"
+    )
     def test_load_statistics_clear_mode(self, mock_get_client):
         """Test clear mode."""
         # Create existing data
@@ -197,7 +206,9 @@ class LoadReviewStatisticsDirectSQLCommandTests(TestCase):
             api_endpoint="https://fi.wikipedia.org/w/api.php",
         )
 
-    @patch("review_statistics.management.commands.load_review_statistics_direct_sql.get_direct_sql_client")
+    @patch(
+        "review_statistics.management.commands.load_review_statistics_direct_sql.get_direct_sql_client"
+    )
     def test_load_review_statistics_success(self, mock_get_client):
         """Test successful review statistics loading."""
         mock_client = MagicMock()
@@ -233,13 +244,13 @@ class LoadReviewStatisticsDirectSQLCommandTests(TestCase):
         self.assertEqual(metadata.max_log_id, 12345)
         self.assertEqual(metadata.total_records, 1)
 
-    @patch("review_statistics.management.commands.load_review_statistics_direct_sql.get_direct_sql_client")
+    @patch(
+        "review_statistics.management.commands.load_review_statistics_direct_sql.get_direct_sql_client"
+    )
     def test_load_review_statistics_incremental(self, mock_get_client):
         """Test incremental loading using max_log_id."""
         # Create existing metadata
-        metadata = ReviewStatisticsMetadata.objects.create(
-            wiki=self.wiki, max_log_id=5000, total_records=100
-        )
+        ReviewStatisticsMetadata.objects.create(wiki=self.wiki, max_log_id=5000, total_records=100)
 
         mock_client = MagicMock()
         mock_client.fetch_review_statistics_from_logging.return_value = []
@@ -256,7 +267,9 @@ class LoadReviewStatisticsDirectSQLCommandTests(TestCase):
             limit=100, min_log_id=5000
         )
 
-    @patch("review_statistics.management.commands.load_review_statistics_direct_sql.get_direct_sql_client")
+    @patch(
+        "review_statistics.management.commands.load_review_statistics_direct_sql.get_direct_sql_client"
+    )
     def test_load_review_statistics_clear_mode(self, mock_get_client):
         """Test clear mode."""
         # Create existing data
@@ -272,9 +285,7 @@ class LoadReviewStatisticsDirectSQLCommandTests(TestCase):
             pending_timestamp="2023-01-01T00:00:00Z",
             review_delay_days=0,
         )
-        ReviewStatisticsMetadata.objects.create(
-            wiki=self.wiki, max_log_id=1000, total_records=1
-        )
+        ReviewStatisticsMetadata.objects.create(wiki=self.wiki, max_log_id=1000, total_records=1)
 
         mock_client = MagicMock()
         mock_client.fetch_review_statistics_from_logging.return_value = []
@@ -292,7 +303,9 @@ class LoadReviewStatisticsDirectSQLCommandTests(TestCase):
         self.assertIsNone(metadata.max_log_id)
         self.assertEqual(metadata.total_records, 0)
 
-    @patch("review_statistics.management.commands.load_review_statistics_direct_sql.get_direct_sql_client")
+    @patch(
+        "review_statistics.management.commands.load_review_statistics_direct_sql.get_direct_sql_client"
+    )
     def test_load_review_statistics_skips_invalid_timestamps(self, mock_get_client):
         """Test that records with invalid timestamps are skipped."""
         mock_client = MagicMock()
@@ -324,7 +337,9 @@ class LoadReviewStatisticsDirectSQLCommandTests(TestCase):
     def test_load_review_statistics_wiki_not_found(self):
         """Test error when wiki doesn't exist."""
         out = StringIO()
-        call_command("load_review_statistics_direct_sql", "--wiki=invalid", "--limit=100", stdout=out)
+        call_command(
+            "load_review_statistics_direct_sql", "--wiki=invalid", "--limit=100", stdout=out
+        )
 
         output = out.getvalue()
         self.assertIn("not found", output)
