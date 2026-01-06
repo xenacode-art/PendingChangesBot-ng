@@ -6,6 +6,43 @@ This document describes the direct SQL implementation for loading statistics fro
 
 The direct SQL implementation was created to address connection pool exhaustion issues when querying wiki replica databases. Following Zache's recommendation, this approach opens database connections only when needed and closes them immediately after use.
 
+## Supported Wikis
+
+**Important:** Not all Wikimedia projects have the FlaggedRevs extension enabled. This statistics implementation only works with wikis that have FlaggedRevs tables in their replica databases.
+
+### Confirmed Working Wikis
+
+These Wikipedias have been tested and confirmed to have FlaggedRevs enabled:
+
+- ✅ **Finnish Wikipedia (fi)** - 169 FlaggedRevs statistics records
+- ✅ **German Wikipedia (de)** - 172 FlaggedRevs statistics records
+
+### Wikis Known to Support FlaggedRevs
+
+Based on MediaWiki documentation, these Wikipedias should also work (not yet tested):
+
+- **Polish Wikipedia (pl)**
+- **Russian Wikipedia (ru)**
+- **Czech Wikipedia (cs)**
+
+### Wikis WITHOUT FlaggedRevs
+
+These Wikipedias do **not** have FlaggedRevs enabled and will return "Table doesn't exist" errors:
+
+- ❌ **English Wikipedia (en)** - No FlaggedRevs
+- ❌ **Swedish Wikipedia (sv)** - No FlaggedRevs
+
+### How to Check if a Wiki Has FlaggedRevs
+
+Before attempting to load statistics for a new wiki:
+
+1. Check the [FlaggedRevs configuration page](https://www.mediawiki.org/wiki/Extension:FlaggedRevs#Configured_wikis)
+2. Or try loading a small dataset and check for errors:
+   ```bash
+   TOOLFORGE_DEPLOYMENT=true python manage.py load_flaggedrevs_statistics_direct_sql --wiki <code>
+   ```
+3. If you see `Table 'xxxwiki_p.flaggedrevs_statistics' doesn't exist`, the wiki doesn't have FlaggedRevs
+
 ## Architecture
 
 ### Components
@@ -290,6 +327,27 @@ def api_statistics_refresh(request: HttpRequest, pk: int) -> JsonResponse:
 **Solution:** Verify database name matches your Toolforge tool account:
 ```python
 TOOLSDB_NAME = os.environ.get("TOOLSDB_NAME", "s57224__pendingchangesbot")
+```
+
+
+### Table Doesn't Exist
+
+**Error:** `Table 'xxxwiki_p.flaggedrevs_statistics' doesn't exist` or `Table 'xxxwiki_p.flaggedrevs' doesn't exist`
+
+**Cause:** The wiki you're trying to load doesn't have the FlaggedRevs extension enabled
+
+**Solution:**
+1. Check the [Supported Wikis](#supported-wikis) section at the top of this document
+2. Only use wikis that are confirmed to have FlaggedRevs (fi, de, pl, ru, cs)
+3. Avoid wikis like English (en) and Swedish (sv) Wikipedia which don't have FlaggedRevs
+
+**Example:**
+```bash
+# ✅ This works - Finnish has FlaggedRevs
+TOOLFORGE_DEPLOYMENT=true python manage.py load_flaggedrevs_statistics_direct_sql --wiki fi
+
+# ❌ This fails - Swedish doesn't have FlaggedRevs  
+TOOLFORGE_DEPLOYMENT=true python manage.py load_flaggedrevs_statistics_direct_sql --wiki sv
 ```
 
 ### No Data Returned
