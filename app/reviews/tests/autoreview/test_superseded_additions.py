@@ -155,7 +155,7 @@ class SupersededAdditionsTests(TestCase):
             wikitext="Original text only. New addition here.",
             categories=[],
         )
-        pending_revision.parent_wikitext = "Original text only"
+        pending_revision.parent_wikitext = "Original text only"  # type: ignore[attr-defined]
         pending_revision.save()
 
         context = CheckContext(
@@ -254,7 +254,7 @@ class SupersededAdditionsTests(TestCase):
             wikitext="Original text. New important addition that remains in current version.",
             categories=[],
         )
-        pending_revision.parent_wikitext = "Original text."
+        pending_revision.parent_wikitext = "Original text."  # type: ignore[attr-defined]
         pending_revision.save()
 
         context = CheckContext(

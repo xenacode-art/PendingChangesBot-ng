@@ -523,8 +523,8 @@ def api_enabled_checks(request: HttpRequest, pk: int) -> JsonResponse:
                     status=400,
                 )
 
-            all_check_ids = {c["id"] for c in AVAILABLE_CHECKS}
-            invalid_ids = [cid for cid in enabled_checks if cid not in all_check_ids]
+            valid_check_ids = {c["id"] for c in AVAILABLE_CHECKS}
+            invalid_ids = [cid for cid in enabled_checks if cid not in valid_check_ids]
             if invalid_ids:
                 return JsonResponse(
                     {"error": f"Invalid check IDs: {', '.join(invalid_ids)}"},
