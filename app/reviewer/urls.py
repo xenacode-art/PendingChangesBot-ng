@@ -61,6 +61,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("", include("reviews.urls")),
     path("", include("review_statistics.urls")),
+    path("bot-control/", include("bot_control.urls")),
     path("openapi.json", openapi_spec, name="openapi-spec"),
     path("openapi.yaml", openapi_spec, {"format": "yaml"}, name="openapi-spec-yaml"),
     path("swagger/", swagger_ui, name="swagger-ui"),
