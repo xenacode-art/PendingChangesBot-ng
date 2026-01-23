@@ -15,6 +15,7 @@ from django.views.decorators.http import require_GET, require_http_methods
 from reviews.models import EditorProfile, Wiki, WikiConfiguration
 from reviews.services import WikiClient
 
+from .direct_sql_services import get_direct_sql_client
 from .models import (
     FlaggedRevsStatistics,
     ReviewActivity,
@@ -24,6 +25,27 @@ from .models import (
 
 logger = logging.getLogger(__name__)
 CACHE_TTL = 60 * 60 * 1
+
+
+def _parse_timestamp(timestamp_value) -> datetime | None:
+    """Parse MediaWiki timestamp format (YYYYMMDDHHMMSS)."""
+    if timestamp_value is None:
+        return None
+    try:
+        # Handle both string and integer formats
+        if isinstance(timestamp_value, bytes):
+            timestamp_str = timestamp_value.decode("utf-8")
+        else:
+            timestamp_str = str(timestamp_value)
+
+        # Remove any whitespace
+        timestamp_str = timestamp_str.strip()
+
+        if len(timestamp_str) == 14:
+            return datetime.strptime(timestamp_str, "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
+    except (ValueError, TypeError):
+        pass
+    return None
 
 
 def calculate_percentile(values: list[float], percentile: float) -> float:
@@ -263,9 +285,9 @@ def api_statistics_charts(request: HttpRequest, pk: int) -> JsonResponse:
     ).order_by("reviewed_timestamp")
 
     # Group data by date or hour depending on time filter
-    reviewers_by_date = defaultdict(set)
-    pending_by_date = defaultdict(int)
-    delays_by_date = defaultdict(list)
+    reviewers_by_date: defaultdict[str, set] = defaultdict(set)
+    pending_by_date: defaultdict[str, int] = defaultdict(int)
+    delays_by_date: defaultdict[str, list] = defaultdict(list)
 
     # For "day" filter, group by hour; otherwise by date
     use_hourly = time_filter == "day"
@@ -333,33 +355,138 @@ def api_statistics_charts(request: HttpRequest, pk: int) -> JsonResponse:
 @csrf_exempt
 @require_http_methods(["POST"])
 def api_statistics_refresh(request: HttpRequest, pk: int) -> JsonResponse:
-    """Incrementally refresh review statistics for a wiki (fetch only new data)."""
+    """Incrementally refresh review statistics for a wiki using direct SQL."""
+    from django.db import transaction
+
     wiki = _get_wiki(pk)
-    client = WikiClient(wiki)
 
     try:
-        result = client.refresh_review_statistics()
-    except Exception as exc:  # pragma: no cover - network failures handled in UI
+        # Get metadata for incremental loading
+        metadata, _ = ReviewStatisticsMetadata.objects.get_or_create(wiki=wiki)
+        min_log_id = metadata.max_log_id
+
+        # Create direct SQL client
+        sql_client = get_direct_sql_client(wiki)
+
+        # Fetch new records (limit to 10k per refresh)
+        limit = 10000
+        payload = sql_client.fetch_review_statistics_from_logging(
+            limit=limit,
+            min_log_id=min_log_id,
+        )
+
+        if not payload:
+            return JsonResponse(
+                {
+                    "total_records": metadata.total_records,
+                    "oldest_timestamp": (
+                        metadata.oldest_review_timestamp.isoformat()
+                        if metadata.oldest_review_timestamp
+                        else None
+                    ),
+                    "newest_timestamp": (
+                        metadata.newest_review_timestamp.isoformat()
+                        if metadata.newest_review_timestamp
+                        else None
+                    ),
+                    "is_incremental": True,
+                    "batches_fetched": 0,
+                    "batch_limit_reached": False,
+                }
+            )
+
+        saved_count = 0
+        max_log_id = min_log_id or 0
+
+        with transaction.atomic():
+            for entry in payload:
+                try:
+                    log_id = entry.get("log_id")
+                    if log_id:
+                        max_log_id = max(max_log_id, log_id)
+
+                    # Parse timestamps
+                    reviewed_timestamp_str = entry.get("reviewed_timestamp")
+                    pending_timestamp_str = entry.get("pending_timestamp")
+
+                    if not reviewed_timestamp_str or not pending_timestamp_str:
+                        continue
+
+                    reviewed_timestamp = _parse_timestamp(reviewed_timestamp_str)
+                    pending_timestamp = _parse_timestamp(pending_timestamp_str)
+
+                    if not reviewed_timestamp or not pending_timestamp:
+                        continue
+
+                    # Create or update record
+                    ReviewStatisticsCache.objects.update_or_create(
+                        wiki=wiki,
+                        reviewed_revision_id=entry.get("reviewed_revision_id"),
+                        defaults={
+                            "reviewer_name": entry.get("reviewer_name", ""),
+                            "reviewed_user_name": entry.get("reviewed_user_name", ""),
+                            "page_title": entry.get("page_title", ""),
+                            "page_id": entry.get("page_id", 0),
+                            "pending_revision_id": entry.get("pending_revision_id", 0),
+                            "reviewed_timestamp": reviewed_timestamp,
+                            "pending_timestamp": pending_timestamp,
+                            "review_delay_days": entry.get("review_delay_days", 0),
+                        },
+                    )
+                    saved_count += 1
+
+                except Exception as e:
+                    logger.warning(f"Failed to process entry: {e}")
+                    continue
+
+            # Update metadata
+            metadata.max_log_id = max_log_id
+            metadata.total_records = ReviewStatisticsCache.objects.filter(wiki=wiki).count()
+            metadata.last_data_loaded_at = timezone.now()
+
+            # Update oldest/newest timestamps
+            oldest = (
+                ReviewStatisticsCache.objects.filter(wiki=wiki)
+                .order_by("reviewed_timestamp")
+                .first()
+            )
+            newest = (
+                ReviewStatisticsCache.objects.filter(wiki=wiki)
+                .order_by("-reviewed_timestamp")
+                .first()
+            )
+            if oldest:
+                metadata.oldest_review_timestamp = oldest.reviewed_timestamp
+            if newest:
+                metadata.newest_review_timestamp = newest.reviewed_timestamp
+
+            metadata.save()
+
+        return JsonResponse(
+            {
+                "total_records": metadata.total_records,
+                "oldest_timestamp": (
+                    metadata.oldest_review_timestamp.isoformat()
+                    if metadata.oldest_review_timestamp
+                    else None
+                ),
+                "newest_timestamp": (
+                    metadata.newest_review_timestamp.isoformat()
+                    if metadata.newest_review_timestamp
+                    else None
+                ),
+                "is_incremental": True,
+                "batches_fetched": 1 if saved_count > 0 else 0,
+                "batch_limit_reached": saved_count >= limit,
+            }
+        )
+
+    except Exception as exc:
         logger.exception("Failed to refresh statistics for %s", wiki.code)
         return JsonResponse(
             {"error": str(exc)},
             status=HTTPStatus.BAD_GATEWAY,
         )
-
-    return JsonResponse(
-        {
-            "total_records": result["total_records"],
-            "oldest_timestamp": (
-                result["oldest_timestamp"].isoformat() if result["oldest_timestamp"] else None
-            ),
-            "newest_timestamp": (
-                result["newest_timestamp"].isoformat() if result["newest_timestamp"] else None
-            ),
-            "is_incremental": result.get("is_incremental", False),
-            "batches_fetched": result.get("batches_fetched", 0),
-            "batch_limit_reached": result.get("batch_limit_reached", False),
-        }
-    )
 
 
 @csrf_exempt
@@ -487,7 +614,7 @@ def api_flaggedrevs_months(request: HttpRequest) -> JsonResponse:
         FlaggedRevsStatistics.objects.values_list("date", flat=True).distinct().order_by("-date")
     )
 
-    months = []
+    months: list[dict[str, str]] = []
     for date in months_data:
         month_value = date.strftime("%Y%m")
 

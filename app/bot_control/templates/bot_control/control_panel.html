@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PendingChangesBot Control Panel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .status-box {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .status-box h2 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .status-running {
+            background-color: #28a745;
+        }
+
+        .status-stopped {
+            background-color: #dc3545;
+            animation: none;
+        }
+
+        .status-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .info-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #666;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            color: #333;
+            font-size: 14px;
+        }
+
+        .controls {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .controls h2 {
+            font-size: 20px;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 12px 30px;
+            font-size: 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-start {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-start:hover:not(:disabled) {
+            background: #218838;
+        }
+
+        .btn-stop {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-stop:hover:not(:disabled) {
+            background: #c82333;
+        }
+
+        .btn-refresh {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-refresh:hover:not(:disabled) {
+            background: #5a6268;
+        }
+
+        .message {
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .message-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .loader {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .manual-review {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .manual-review h2 {
+            font-size: 20px;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            font-size: 14px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
+        .form-group small {
+            display: block;
+            margin-top: 5px;
+        }
+
+        .btn-submit {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-submit:hover:not(:disabled) {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="container">
+        <h1>🤖 PendingChangesBot Control Panel</h1>
+
+        <!-- Status Display -->
+        <div class="status-box">
+            <h2>
+                <span class="status-indicator" :class="statusClass"></span>
+                Status: [[ statusText ]]
+            </h2>
+
+            <div class="status-info">
+                <div class="info-item" v-if="botStatus.started_at">
+                    <div class="info-label">Started At</div>
+                    <div class="info-value">[[ formatDate(botStatus.started_at) ]]</div>
+                </div>
+                <div class="info-item" v-if="botStatus.stopped_at">
+                    <div class="info-label">Stopped At</div>
+                    <div class="info-value">[[ formatDate(botStatus.stopped_at) ]]</div>
+                </div>
+                <div class="info-item" v-if="botStatus.last_activity">
+                    <div class="info-label">Last Activity</div>
+                    <div class="info-value">[[ formatDate(botStatus.last_activity) ]]</div>
+                </div>
+                <div class="info-item" v-if="botStatus.process_id">
+                    <div class="info-label">Process ID</div>
+                    <div class="info-value">[[ botStatus.process_id ]]</div>
+                </div>
+            </div>
+
+            <div v-if="botStatus.error_message" class="message message-error">
+                <strong>Error:</strong> [[ botStatus.error_message ]]
+            </div>
+        </div>
+
+        <!-- Control Buttons -->
+        <div class="controls">
+            <h2>Bot Control</h2>
+            <div class="button-group">
+                <button
+                    @click="startBot"
+                    :disabled="isRunning || loading"
+                    class="btn-start">
+                    <span v-if="loading && action === 'start'" class="loader"></span>
+                    <span v-else>▶ Start Bot</span>
+                </button>
+
+                <button
+                    @click="stopBot"
+                    :disabled="!isRunning || loading"
+                    class="btn-stop">
+                    <span v-if="loading && action === 'stop'" class="loader"></span>
+                    <span v-else>⏹ Stop Bot</span>
+                </button>
+
+                <button
+                    @click="refreshStatus"
+                    :disabled="loading"
+                    class="btn-refresh">
+                    <span v-if="loading && action === 'refresh'" class="loader"></span>
+                    <span v-else>🔄 Refresh Status</span>
+                </button>
+            </div>
+
+            <div v-if="message" :class="['message', messageClass]">
+                [[ message ]]
+            </div>
+        </div>
+
+        <!-- Manual Review Section -->
+        <div class="manual-review">
+            <h2>Manual Review</h2>
+            <p style="color: #666; font-size: 14px; margin-bottom: 20px;">
+                Manually trigger a review for a specific page. This will check the page against bot rules and optionally approve it.
+            </p>
+
+            <form @submit.prevent="triggerManualReview">
+                <div class="form-group">
+                    <label for="page_title">Page Title *</label>
+                    <input
+                        v-model="manualReview.page_title"
+                        type="text"
+                        id="page_title"
+                        placeholder="e.g., User:Example or Main_Page"
+                        required>
+                    <small style="color: #666; font-size: 12px;">Enter the full page title including namespace</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="revision_id">Revision ID (Optional)</label>
+                    <input
+                        v-model="manualReview.revision_id"
+                        type="text"
+                        id="revision_id"
+                        placeholder="e.g., 123456 (leave empty for latest revision)">
+                    <small style="color: #666; font-size: 12px;">Specific revision to review, or leave blank for latest</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="wiki">Wiki</label>
+                    <select v-model="manualReview.wiki" id="wiki">
+                        <option value="fi">Finnish Wikipedia (fi)</option>
+                        <option value="de">German Wikipedia (de)</option>
+                    </select>
+                </div>
+
+                <button type="submit" :disabled="loading" class="btn-submit">
+                    <span v-if="loading && action === 'review'" class="loader"></span>
+                    <span v-else>🔍 Trigger Review</span>
+                </button>
+            </form>
+
+            <div v-if="reviewMessage" :class="['message', reviewMessageClass]" style="margin-top: 20px;">
+                [[ reviewMessage ]]
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            delimiters: ['[[', ']]'],
+            data() {
+                return {
+                    botStatus: {
+                        is_running: false,
+                        process_id: null,
+                        started_at: null,
+                        stopped_at: null,
+                        last_activity: null,
+                        error_message: ''
+                    },
+                    loading: false,
+                    action: '',
+                    message: '',
+                    messageType: 'success',
+                    manualReview: {
+                        page_title: '',
+                        revision_id: '',
+                        wiki: 'fi'
+                    },
+                    reviewMessage: '',
+                    reviewMessageType: 'success'
+                };
+            },
+            computed: {
+                isRunning() {
+                    return this.botStatus.is_running;
+                },
+                statusText() {
+                    return this.isRunning ? 'Running' : 'Stopped';
+                },
+                statusClass() {
+                    return this.isRunning ? 'status-running' : 'status-stopped';
+                },
+                messageClass() {
+                    return `message-${this.messageType}`;
+                },
+                reviewMessageClass() {
+                    return `message-${this.reviewMessageType}`;
+                }
+            },
+            methods: {
+                async fetchStatus() {
+                    try {
+                        const response = await fetch('/bot-control/api/status/');
+                        const data = await response.json();
+                        this.botStatus = data;
+                    } catch (error) {
+                        console.error('Failed to fetch status:', error);
+                    }
+                },
+                async startBot() {
+                    this.loading = true;
+                    this.action = 'start';
+                    this.message = '';
+
+                    try {
+                        const response = await fetch('/bot-control/api/start/', {
+                            method: 'POST'
+                        });
+
+                        const data = await response.json();
+
+                        if (response.ok) {
+                            this.botStatus = data.status;
+                            this.showMessage(data.message, 'success');
+                        } else {
+                            this.showMessage(data.error || 'Failed to start bot', 'error');
+                        }
+                    } catch (error) {
+                        this.showMessage('Error: ' + error.message, 'error');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                async stopBot() {
+                    this.loading = true;
+                    this.action = 'stop';
+                    this.message = '';
+
+                    try {
+                        const response = await fetch('/bot-control/api/stop/', {
+                            method: 'POST'
+                        });
+
+                        const data = await response.json();
+
+                        if (response.ok) {
+                            this.botStatus = data.status;
+                            this.showMessage(data.message, 'success');
+                        } else {
+                            this.showMessage(data.error || 'Failed to stop bot', 'error');
+                        }
+                    } catch (error) {
+                        this.showMessage('Error: ' + error.message, 'error');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                refreshStatus() {
+                    this.loading = true;
+                    this.action = 'refresh';
+                    this.fetchStatus().finally(() => {
+                        this.loading = false;
+                    });
+                },
+                showMessage(msg, type) {
+                    this.message = msg;
+                    this.messageType = type;
+                    setTimeout(() => {
+                        this.message = '';
+                    }, 5000);
+                },
+                showReviewMessage(msg, type) {
+                    this.reviewMessage = msg;
+                    this.reviewMessageType = type;
+                    setTimeout(() => {
+                        this.reviewMessage = '';
+                    }, 8000);
+                },
+                async triggerManualReview() {
+                    this.loading = true;
+                    this.action = 'review';
+                    this.reviewMessage = '';
+
+                    try {
+                        const response = await fetch('/bot-control/api/review/', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(this.manualReview)
+                        });
+
+                        const data = await response.json();
+
+                        if (response.ok) {
+                            const msg = `✅ ${data.message}\n\nWiki: ${data.wiki}\nPage: ${data.page_title}\nRevision: ${data.revision_id}\n\n${data.note}`;
+                            this.showReviewMessage(msg, 'success');
+                            // Clear form on success
+                            this.manualReview.page_title = '';
+                            this.manualReview.revision_id = '';
+                        } else {
+                            this.showReviewMessage('❌ ' + (data.error || 'Failed to trigger review'), 'error');
+                        }
+                    } catch (error) {
+                        this.showReviewMessage('❌ Error: ' + error.message, 'error');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                formatDate(dateString) {
+                    if (!dateString) return 'N/A';
+                    const date = new Date(dateString);
+                    return date.toLocaleString();
+                }
+            },
+            mounted() {
+                // Fetch initial status
+                this.fetchStatus();
+
+                // Auto-refresh every 5 seconds
+                setInterval(() => {
+                    if (!this.loading) {
+                        this.fetchStatus();
+                    }
+                }, 5000);
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
