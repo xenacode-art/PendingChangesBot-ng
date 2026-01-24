@@ -191,14 +191,10 @@ ORDER BY fp_pending_since, rev_id DESC
         connection_manager = WikiReplicaConnection(self.wiki)
 
         try:
-            with connection_manager.get_connection() as connection:
-                cursor = connection.cursor(dictionary=True)
-                cursor.execute(sql_query)
-                payload = cursor.fetchall()
-                cursor.close()
+            payload = connection_manager.execute_query(sql_query)
         except Exception as e:
-            logger.error(f"Failed to fetch pending pages from wiki replica: {e}")
-            raise RuntimeError(f"Failed to fetch pending pages: {e}")
+            logger.error("Failed to fetch pending pages from wiki replica: %s", e)
+            raise RuntimeError(f"Failed to fetch pending pages: {e}") from e
 
         pages: list[PendingPage] = []
         pages_by_id: dict[int, PendingPage] = {}
