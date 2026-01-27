@@ -12,4 +12,5 @@ urlpatterns = [
     path("api/stop/", views.stop_bot, name="api_stop"),
     path("api/status/", views.get_status, name="api_status"),
     path("api/review/", views.manual_review, name="api_manual_review"),
+    path("api/user/permissions/", views.get_user_permissions, name="api_user_permissions"),
 ]

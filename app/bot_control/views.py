@@ -12,6 +12,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from .models import BotStatus
+from .permissions import UserRole, require_permission, get_user_info
 
 
 def bot_control_page(request):
@@ -21,8 +22,9 @@ def bot_control_page(request):
 
 @csrf_exempt  # TODO: Add proper CSRF protection in production
 @require_http_methods(["POST"])
+@require_permission(UserRole.ADMIN)
 def start_bot(request):
-    """Start the bot process"""
+    """Start the bot process (requires ADMIN role)"""
     bot_status = BotStatus.get_current_status()
 
     if bot_status.is_running:
@@ -78,8 +80,9 @@ def start_bot(request):
 
 @csrf_exempt  # TODO: Add proper CSRF protection in production
 @require_http_methods(["POST"])
+@require_permission(UserRole.ADMIN)
 def stop_bot(request):
-    """Stop the bot process"""
+    """Stop the bot process (requires ADMIN role)"""
     bot_status = BotStatus.get_current_status()
 
     if not bot_status.is_running:
@@ -131,7 +134,7 @@ def stop_bot(request):
 
 @require_http_methods(["GET"])
 def get_status(request):
-    """Get current bot status"""
+    """Get current bot status (public endpoint)"""
     bot_status = BotStatus.get_current_status()
 
     return JsonResponse(
@@ -148,10 +151,37 @@ def get_status(request):
     )
 
 
+@require_http_methods(["GET"])
+def get_user_permissions(request):
+    """Get current user's role and permissions"""
+    username = request.META.get("HTTP_X_WIKI_USERNAME")
+    wiki_code = request.META.get("HTTP_X_WIKI_CODE", "fi")
+
+    if not username:
+        # Return public user permissions
+        return JsonResponse({
+            "username": None,
+            "wiki": f"{wiki_code}.wikipedia",
+            "role": "public",
+            "groups": [],
+            "permissions": {
+                "can_start_stop_bot": False,
+                "can_manual_review": False,
+                "can_change_settings": False,
+                "can_view_status": True,
+            }
+        })
+
+    # Get authenticated user's permissions
+    user_info = get_user_info(username, wiki_code)
+    return JsonResponse(user_info)
+
+
 @csrf_exempt  # TODO: Add proper CSRF protection in production
 @require_http_methods(["POST"])
+@require_permission(UserRole.REVIEWER)
 def manual_review(request):
-    """Manually trigger a review for a specific page"""
+    """Manually trigger a review for a specific page (requires REVIEWER role)"""
     try:
         # Parse request body
         data = json.loads(request.body)
