@@ -963,6 +963,25 @@ createApp({
       }
     }
 
+    function exportStatistics(format) {
+      if (!state.selectedWikiId) {
+        return;
+      }
+      const params = new URLSearchParams();
+      params.set('format', format);
+
+      // Add current filters
+      if (state.statistics.timeFilter && state.statistics.timeFilter !== 'all') {
+        params.set('time_filter', state.statistics.timeFilter);
+      }
+      if (state.statistics.excludeAutoReviewers) {
+        params.set('exclude_auto_reviewers', 'true');
+      }
+
+      const url = `/api/wikis/${state.selectedWikiId}/statistics/export/?${params.toString()}`;
+      window.open(url, '_blank');
+    }
+
     function buildUserPageUrl(username) {
       const origin = getWikiOrigin();
       if (!origin || !username) {
@@ -1259,6 +1278,7 @@ createApp({
       loadStatistics,
       refreshStatistics,
       clearAndReloadStatistics,
+      exportStatistics,
       setTimeFilter,
       formatTitle,
       buildLatestRevisionUrl,

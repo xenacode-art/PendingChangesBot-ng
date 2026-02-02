@@ -7,6 +7,7 @@
     <title>Review Statistics</title>
     <link rel="stylesheet" href="{% static 'css/bulma.0.9.4.min.css' %}" />
     <link rel="stylesheet" href="{% static 'css/main.css' %}" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   </head>
   <body>
@@ -107,6 +108,28 @@
               >
                 Reload from cache
               </button>
+            </div>
+            <div class="control">
+              <div class="dropdown is-hoverable">
+                <div class="dropdown-trigger">
+                  <button class="button is-success" aria-haspopup="true" aria-controls="export-menu">
+                    <span>Export</span>
+                    <span class="icon is-small">
+                      <i class="fas fa-angle-down"></i>
+                    </span>
+                  </button>
+                </div>
+                <div class="dropdown-menu" id="export-menu" role="menu">
+                  <div class="dropdown-content">
+                    <a class="dropdown-item" @click="exportStatistics('json')">
+                      Export as JSON
+                    </a>
+                    <a class="dropdown-item" @click="exportStatistics('csv')">
+                      Export as CSV
+                    </a>
+                  </div>
+                </div>
+              </div>
             </div>
             <div class="control">
               <a href="/" class="button is-light">
