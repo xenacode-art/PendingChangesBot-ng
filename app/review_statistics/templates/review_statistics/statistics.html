@@ -39,6 +39,78 @@
         </div>
       </section>
 
+      <!-- Bot Status Widget -->
+      <div class="box mb-4" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+        <div class="columns is-vcentered">
+          <div class="column is-narrow">
+            <span class="icon is-large has-text-white">
+              <i class="fas fa-robot fa-2x"></i>
+            </span>
+          </div>
+          <div class="column">
+            <p class="has-text-white has-text-weight-bold is-size-5">Bot Status</p>
+            <p class="has-text-white-ter">
+              <span class="tag" :class="getBotStatusClass()">
+                <span class="icon is-small">
+                  <i :class="state.botStatus.is_running ? 'fas fa-circle-play' : 'fas fa-circle-stop'"></i>
+                </span>
+                <span>{{ getBotStatusText() }}</span>
+              </span>
+              <span v-if="state.botStatus.last_activity" class="ml-2">
+                Last activity: {{ formatDateTime(state.botStatus.last_activity) }}
+              </span>
+            </p>
+          </div>
+          <div class="column is-narrow">
+            <a href="/bot-control/" class="button is-white is-outlined">
+              <span class="icon"><i class="fas fa-cog"></i></span>
+              <span>Control Panel</span>
+            </a>
+          </div>
+        </div>
+        <div v-if="state.botStatus.error_message" class="notification is-danger is-light mt-2">
+          <strong>Error:</strong> {{ state.botStatus.error_message }}
+        </div>
+      </div>
+
+      <!-- Bot Activity Summary -->
+      <div class="box mb-4" v-if="state.botActivity.summary">
+        <h4 class="title is-5">
+          <span class="icon"><i class="fas fa-chart-line"></i></span>
+          <span>Bot Activity (Last 7 Days)</span>
+        </h4>
+        <div class="columns is-multiline">
+          <div class="column is-3">
+            <div class="has-text-centered">
+              <p class="heading">Total Reviews</p>
+              <p class="title is-4">{{ state.botActivity.summary.total }}</p>
+            </div>
+          </div>
+          <div class="column is-3">
+            <div class="has-text-centered">
+              <p class="heading">Approved</p>
+              <p class="title is-4 has-text-success">{{ state.botActivity.summary.approved }}</p>
+            </div>
+          </div>
+          <div class="column is-3">
+            <div class="has-text-centered">
+              <p class="heading">Blocked</p>
+              <p class="title is-4 has-text-danger">{{ state.botActivity.summary.blocked }}</p>
+            </div>
+          </div>
+          <div class="column is-3">
+            <div class="has-text-centered">
+              <p class="heading">Manual Review</p>
+              <p class="title is-4 has-text-warning">{{ state.botActivity.summary.manual }}</p>
+            </div>
+          </div>
+        </div>
+        <div v-if="state.botActivity.summary.total === 0" class="notification is-info is-light">
+          <span class="icon"><i class="fas fa-info-circle"></i></span>
+          <span>No bot activity recorded yet. Run autoreview to see activity data.</span>
+        </div>
+      </div>
+
       <div v-if="state.selectedWikiId">
         <div class="mb-4" v-if="state.statistics.metadata">
           <p class="is-size-7 has-text-grey">

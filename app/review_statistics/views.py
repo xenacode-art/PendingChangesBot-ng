@@ -678,8 +678,18 @@ def api_statistics_export(request: HttpRequest, pk: int) -> HttpResponse:
         )
         statistics_qs = statistics_qs.exclude(reviewed_user_name__in=auto_reviewers)
 
-    # Get records
-    records = statistics_qs.order_by("-reviewed_timestamp")[:limit]
+    # Get records - use only() to fetch only needed fields for better performance
+    records = statistics_qs.only(
+        "reviewer_name",
+        "reviewed_user_name",
+        "page_title",
+        "page_id",
+        "reviewed_revision_id",
+        "pending_revision_id",
+        "reviewed_timestamp",
+        "pending_timestamp",
+        "review_delay_days",
+    ).order_by("-reviewed_timestamp")[:limit]
 
     # Build data list
     data = [

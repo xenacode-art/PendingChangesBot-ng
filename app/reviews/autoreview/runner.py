@@ -91,8 +91,9 @@ def run_checks_pipeline(
     }
 
 
-def run_autoreview_for_page(page: PendingPage) -> list[dict]:
+def run_autoreview_for_page(page: PendingPage, log_activity: bool = True) -> list[dict]:
     """Run the configured autoreview checks for each pending revision of a page."""
+    from bot_control.models import BotActivity
     from reviews.models import EditorProfile
     from reviews.services import WikiClient
 
@@ -127,17 +128,44 @@ def run_autoreview_for_page(page: PendingPage) -> list[dict]:
             blocking_categories=blocking_categories,
             redirect_aliases=redirect_aliases,
         )
-        results.append(
-            {
-                "revid": revision.revid,
-                "tests": revision_result["tests"],
-                "decision": {
-                    "status": revision_result["decision"].status,
-                    "label": revision_result["decision"].label,
-                    "reason": revision_result["decision"].reason,
-                },
-                "total_duration_ms": revision_result["total_duration_ms"],
-            }
-        )
+        result_data = {
+            "revid": revision.revid,
+            "tests": revision_result["tests"],
+            "decision": {
+                "status": revision_result["decision"].status,
+                "label": revision_result["decision"].label,
+                "reason": revision_result["decision"].reason,
+            },
+            "total_duration_ms": revision_result["total_duration_ms"],
+        }
+        results.append(result_data)
+
+        # Log activity for statistics tracking
+        if log_activity:
+            try:
+                # Find the determining check (the one that made the decision)
+                determining_check = ""
+                for test in revision_result["tests"]:
+                    if test.get("decision"):
+                        determining_check = test.get("id", "")
+                        break
+
+                BotActivity.log_activity(
+                    wiki_code=page.wiki.code,
+                    page_id=page.pageid,
+                    page_title=page.title,
+                    revision_id=revision.revid,
+                    user_name=revision.user_name or "",
+                    decision=revision_result["decision"].status,
+                    decision_label=revision_result["decision"].label,
+                    decision_reason=revision_result["decision"].reason,
+                    determining_check=determining_check,
+                    total_checks_run=len(revision_result["tests"]),
+                    execution_time_ms=revision_result["total_duration_ms"],
+                    is_dry_run=True,
+                )
+            except Exception:
+                # Don't let logging failures break the autoreview
+                pass
 
     return results
