@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 from typing import TYPE_CHECKING
 
@@ -8,6 +9,8 @@ from .context import CheckContext
 from .decision import AutoreviewDecision
 from .utils.redirect import get_redirect_aliases
 from .utils.user import normalize_to_lookup
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from reviews.models import EditorProfile, PendingPage, PendingRevision
@@ -91,11 +94,21 @@ def run_checks_pipeline(
     }
 
 
-def run_autoreview_for_page(page: PendingPage, log_activity: bool = True) -> list[dict]:
-    """Run the configured autoreview checks for each pending revision of a page."""
+def run_autoreview_for_page(
+    page: PendingPage, log_activity: bool = True, dry_run: bool = True
+) -> list[dict]:
+    """Run the configured autoreview checks for each pending revision of a page.
+
+    Args:
+        page: The page whose pending revisions should be reviewed.
+        log_activity: Whether to log decisions to BotActivity.
+        dry_run: When *False* and a revision is approved, actually call the
+            FlaggedRevs ``action=review`` API.  Defaults to *True* (no real
+            reviews are submitted).
+    """
     from bot_control.models import BotActivity
     from reviews.models import EditorProfile
-    from reviews.services import WikiClient
+    from reviews.services import FlaggedRevsClient, WikiClient
 
     revisions = list(page.revisions.exclude(revid=page.stable_revid).order_by("timestamp", "revid"))
     if not revisions:
@@ -128,15 +141,45 @@ def run_autoreview_for_page(page: PendingPage, log_activity: bool = True) -> lis
             blocking_categories=blocking_categories,
             redirect_aliases=redirect_aliases,
         )
+        decision_status = revision_result["decision"].status
+
+        # If the decision is to approve and we are NOT in dry-run mode,
+        # actually submit the review via the FlaggedRevs API.
+        review_submitted = False
+        review_message = ""
+        if decision_status == "approve" and not dry_run:
+            try:
+                fr_client = FlaggedRevsClient(client.site)
+                review_result = fr_client.review_revision(
+                    revid=revision.revid,
+                    comment="Auto-approved by PendingChangesBot",
+                )
+                review_submitted = review_result.success
+                review_message = review_result.message
+                if not review_result.success:
+                    logger.warning(
+                        "FlaggedRevs review failed for rev %s: %s",
+                        revision.revid,
+                        review_result.message,
+                    )
+            except Exception:
+                logger.exception(
+                    "Failed to submit FlaggedRevs review for rev %s",
+                    revision.revid,
+                )
+
         result_data = {
             "revid": revision.revid,
             "tests": revision_result["tests"],
             "decision": {
-                "status": revision_result["decision"].status,
+                "status": decision_status,
                 "label": revision_result["decision"].label,
                 "reason": revision_result["decision"].reason,
             },
             "total_duration_ms": revision_result["total_duration_ms"],
+            "mode": "dry-run" if dry_run else "live",
+            "review_submitted": review_submitted,
+            "review_message": review_message,
         }
         results.append(result_data)
 
@@ -156,13 +199,13 @@ def run_autoreview_for_page(page: PendingPage, log_activity: bool = True) -> lis
                     page_title=page.title,
                     revision_id=revision.revid,
                     user_name=revision.user_name or "",
-                    decision=revision_result["decision"].status,
+                    decision=decision_status,
                     decision_label=revision_result["decision"].label,
                     decision_reason=revision_result["decision"].reason,
                     determining_check=determining_check,
                     total_checks_run=len(revision_result["tests"]),
                     execution_time_ms=revision_result["total_duration_ms"],
-                    is_dry_run=True,
+                    is_dry_run=dry_run,
                 )
             except Exception:
                 # Don't let logging failures break the autoreview
