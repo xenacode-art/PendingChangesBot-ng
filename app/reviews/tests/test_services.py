@@ -56,11 +56,11 @@ class WikiClientTests(TestCase):
         )
         self.site_patcher.start()
         self.addCleanup(self.site_patcher.stop)
-        self.superset_patcher = mock.patch("reviews.services.wiki_client.SupersetQuery")
-        self.mock_superset_cls = self.superset_patcher.start()
-        self.addCleanup(self.superset_patcher.stop)
-        self.mock_superset = self.mock_superset_cls.return_value
-        self.mock_superset.query.return_value = []
+        self.replica_patcher = mock.patch("reviews.services.wiki_client.WikiReplicaConnection")
+        self.mock_replica_cls = self.replica_patcher.start()
+        self.addCleanup(self.replica_patcher.stop)
+        self.mock_replica = self.mock_replica_cls.return_value
+        self.mock_replica.execute_query.return_value = []
 
     def test_parse_categories_extracts_unique_names(self):
         wikitext = (
@@ -70,7 +70,7 @@ class WikiClientTests(TestCase):
         self.assertEqual(categories, ["Example", "Second"])
 
     def test_fetch_pending_pages_caches_pages(self):
-        self.mock_superset.query.return_value = [
+        self.mock_replica.execute_query.return_value = [
             {
                 "fp_page_id": 123,
                 "page_title": "Example",
@@ -98,7 +98,7 @@ class WikiClientTests(TestCase):
         self.assertEqual(page.pageid, 123)
         self.assertEqual(page.stable_revid, 10)
         self.assertIsNotNone(page.pending_since)
-        sql_argument = self.mock_superset.query.call_args[0][0]
+        sql_argument = self.mock_replica.execute_query.call_args[0][0]
         self.assertIn("LIMIT 10) AS fp", sql_argument)
         self.assertIn("r.rev_id>=fp_stable", sql_argument)
         revision = PendingRevision.objects.get()
@@ -112,7 +112,7 @@ class WikiClientTests(TestCase):
         self.assertEqual(revision.superset_data["page_categories"], ["Foo", "Bar"])
 
     def test_fetch_pending_pages_includes_stable_revision_record(self):
-        self.mock_superset.query.return_value = [
+        self.mock_replica.execute_query.return_value = [
             {
                 "fp_page_id": 555,
                 "page_title": "WithStable",
@@ -150,7 +150,7 @@ class WikiClientTests(TestCase):
         self.assertEqual(page.stable_revid, 30)
 
     def test_fetch_pending_pages_hydrates_editor_profile(self):
-        self.mock_superset.query.return_value = [
+        self.mock_replica.execute_query.return_value = [
             {
                 "fp_page_id": 222,
                 "page_title": "Profile",
@@ -180,9 +180,9 @@ class WikiClientTests(TestCase):
 
 
 class RefreshWorkflowTests(TestCase):
-    @mock.patch("reviews.services.wiki_client.SupersetQuery")
+    @mock.patch("reviews.services.wiki_client.WikiReplicaConnection")
     @mock.patch("reviews.services.wiki_client.pywikibot.Site")
-    def test_refresh_handles_errors(self, mock_site, mock_superset):
+    def test_refresh_handles_errors(self, mock_site, mock_replica):
         wiki = Wiki.objects.create(
             name="Test Wiki",
             code="test",
@@ -191,14 +191,14 @@ class RefreshWorkflowTests(TestCase):
         fake_site = FakeSite()
         fake_site.response = {"query": {"pages": []}}
         mock_site.return_value = fake_site
-        mock_superset.return_value.query.side_effect = RuntimeError("boom")
+        mock_replica.return_value.execute_query.side_effect = RuntimeError("boom")
         client = WikiClient(wiki)
         with self.assertRaises(RuntimeError):
             client.refresh()
 
-    @mock.patch("reviews.services.wiki_client.SupersetQuery")
+    @mock.patch("reviews.services.wiki_client.WikiReplicaConnection")
     @mock.patch("reviews.services.wiki_client.pywikibot.Site")
-    def test_refresh_does_not_call_pywikibot_requests(self, mock_site, mock_superset):
+    def test_refresh_does_not_call_pywikibot_requests(self, mock_site, mock_replica):
         wiki = Wiki.objects.create(
             name="Test Wiki",
             code="test",
@@ -206,7 +206,7 @@ class RefreshWorkflowTests(TestCase):
         )
         fake_site = FakeSite()
         mock_site.return_value = fake_site
-        mock_superset.return_value.query.return_value = [
+        mock_replica.return_value.execute_query.return_value = [
             {
                 "fp_page_id": 1,
                 "page_title": "Page",
