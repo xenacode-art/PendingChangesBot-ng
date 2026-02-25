@@ -332,6 +332,60 @@ ORDER BY fp_pending_since, rev_id DESC
         )
         return profile
 
+    def get_pending_changes_status(
+        self, page_ids: list[int] | None = None, titles: list[str] | None = None
+    ) -> list[dict[str, Any]]:
+        """Query the FlaggedRevs API for the flagged status of pages.
+
+        Uses ``action=query&prop=info|flagged`` to retrieve the current review
+        state of one or more pages, including stable revision, pending revision,
+        and protection settings.
+
+        Args:
+            page_ids: List of page IDs to query.
+            titles: List of page titles to query (used if *page_ids* is empty).
+
+        Returns:
+            A list of dicts, each containing:
+            - pageid, title, stable_revid, pending_since, flagged (raw API data)
+        """
+        if not page_ids and not titles:
+            return []
+
+        params: dict[str, Any] = {
+            "action": "query",
+            "prop": "info|flagged",
+            "formatversion": 2,
+        }
+        if page_ids:
+            params["pageids"] = "|".join(str(pid) for pid in page_ids)
+        else:
+            params["titles"] = "|".join(titles or [])
+
+        request = self.site.simple_request(**params)
+        try:
+            response = request.submit()
+        except Exception:
+            logger.exception("Failed to query flagged status for %s", self.wiki.code)
+            return []
+
+        pages = response.get("query", {}).get("pages", [])
+        results: list[dict[str, Any]] = []
+        for page in pages:
+            flagged = page.get("flagged", {})
+            results.append(
+                {
+                    "pageid": page.get("pageid"),
+                    "title": page.get("title", ""),
+                    "stable_revid": flagged.get("stable_revid"),
+                    "pending_since": flagged.get("pending_since"),
+                    "protection_level": flagged.get("protection_level"),
+                    "level": flagged.get("level"),
+                    "flagged": flagged,
+                }
+            )
+        return results
+
     def refresh(self) -> list[PendingPage]:
         return self.fetch_pending_pages()
 

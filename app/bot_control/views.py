@@ -3,16 +3,19 @@ import os
 import signal
 import subprocess
 import sys
+from datetime import timedelta
 from pathlib import Path
 
+from django.db.models import Count
+from django.db.models.functions import TruncDate
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_GET, require_http_methods
 
-from .models import BotStatus
-from .permissions import UserRole, require_permission, get_user_info
+from .models import BotActivity, BotStatus
+from .permissions import UserRole, get_user_info, require_permission
 
 
 def bot_control_page(request):
@@ -217,3 +220,97 @@ def manual_review(request):
         return JsonResponse({"error": "Invalid JSON in request body"}, status=400)
     except Exception as e:
         return JsonResponse({"error": f"Failed to trigger manual review: {str(e)}"}, status=500)
+
+
+@require_GET
+def get_bot_activity(request):
+    """Get bot activity records for display in statistics"""
+    wiki = request.GET.get("wiki", "").strip()
+    decision = request.GET.get("decision", "").strip()
+    limit = min(int(request.GET.get("limit", 100)), 500)
+
+    queryset = BotActivity.objects.all()
+
+    if wiki:
+        queryset = queryset.filter(wiki_code=wiki)
+
+    if decision:
+        queryset = queryset.filter(decision=decision)
+
+    activities = queryset[:limit]
+
+    records = [
+        {
+            "wiki_code": activity.wiki_code,
+            "page_id": activity.page_id,
+            "page_title": activity.page_title,
+            "revision_id": activity.revision_id,
+            "user_name": activity.user_name,
+            "decision": activity.decision,
+            "decision_label": activity.decision_label,
+            "decision_reason": activity.decision_reason,
+            "determining_check": activity.determining_check,
+            "total_checks_run": activity.total_checks_run,
+            "execution_time_ms": activity.execution_time_ms,
+            "created_at": activity.created_at.isoformat(),
+            "is_dry_run": activity.is_dry_run,
+        }
+        for activity in activities
+    ]
+
+    return JsonResponse({"activities": records, "count": len(records)})
+
+
+@require_GET
+def get_bot_activity_summary(request):
+    """Get summary statistics of bot activity for charts"""
+    wiki = request.GET.get("wiki", "").strip()
+    days = int(request.GET.get("days", 7))
+
+    cutoff = timezone.now() - timedelta(days=days)
+
+    queryset = BotActivity.objects.filter(created_at__gte=cutoff)
+
+    if wiki:
+        queryset = queryset.filter(wiki_code=wiki)
+
+    # Decision breakdown
+    decision_counts = queryset.values("decision").annotate(
+        count=Count("id")
+    ).order_by("-count")
+
+    # Activity by day
+    daily_activity = queryset.annotate(
+        date=TruncDate("created_at")
+    ).values("date").annotate(
+        count=Count("id")
+    ).order_by("date")
+
+    # Top determining checks
+    top_checks = queryset.exclude(
+        determining_check=""
+    ).values("determining_check").annotate(
+        count=Count("id")
+    ).order_by("-count")[:10]
+
+    # Total stats
+    total_activities = queryset.count()
+    approved_count = queryset.filter(decision="approve").count()
+    blocked_count = queryset.filter(decision="blocked").count()
+    manual_count = queryset.filter(decision="manual").count()
+
+    return JsonResponse({
+        "summary": {
+            "total": total_activities,
+            "approved": approved_count,
+            "blocked": blocked_count,
+            "manual": manual_count,
+            "days": days,
+        },
+        "decision_breakdown": list(decision_counts),
+        "daily_activity": [
+            {"date": item["date"].isoformat(), "count": item["count"]}
+            for item in daily_activity
+        ],
+        "top_checks": list(top_checks),
+    })
