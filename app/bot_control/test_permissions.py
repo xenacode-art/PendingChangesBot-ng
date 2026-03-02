@@ -5,6 +5,7 @@ Tests for the permissions system.
 import unittest
 from unittest.mock import patch, MagicMock
 
+from django.contrib.sessions.backends.db import SessionStore
 from django.test import TestCase, RequestFactory
 
 from .permissions import (
@@ -141,7 +142,8 @@ class PermissionsTestCase(TestCase):
             return {"success": True}
 
         request = self.factory.post("/test/")
-        request.META["HTTP_X_WIKI_USERNAME"] = "AdminUser"
+        request.session = SessionStore()
+        request.session["wiki_username"] = "AdminUser"
 
         response = protected_view(request)
 
@@ -157,7 +159,8 @@ class PermissionsTestCase(TestCase):
             return {"success": True}
 
         request = self.factory.post("/test/")
-        request.META["HTTP_X_WIKI_USERNAME"] = "PublicUser"
+        request.session = SessionStore()
+        request.session["wiki_username"] = "PublicUser"
 
         response = protected_view(request)
 
@@ -171,7 +174,7 @@ class PermissionsTestCase(TestCase):
             return {"success": True}
 
         request = self.factory.post("/test/")
-        # No username in headers
+        request.session = SessionStore()
 
         response = protected_view(request)
 

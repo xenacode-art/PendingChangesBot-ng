@@ -136,10 +136,9 @@ def require_permission(required_role: UserRole) -> Callable:
     def decorator(view_func: Callable) -> Callable:
         @wraps(view_func)
         def wrapper(request: HttpRequest, *args, **kwargs):
-            # TODO: Get username from session/OAuth (Week 8 implementation)
-            # For now, check if username is in request headers (for testing)
-            username = request.META.get("HTTP_X_WIKI_USERNAME")
-            wiki_code = request.META.get("HTTP_X_WIKI_CODE", "fi")
+            # Get username from Django session (set during OAuth login)
+            username = request.session.get("wiki_username")
+            wiki_code = request.session.get("wiki_code", "fi")
 
             if not username:
                 return JsonResponse(

@@ -157,8 +157,8 @@ def get_status(request):
 @require_http_methods(["GET"])
 def get_user_permissions(request):
     """Get current user's role and permissions"""
-    username = request.META.get("HTTP_X_WIKI_USERNAME")
-    wiki_code = request.META.get("HTTP_X_WIKI_CODE", "fi")
+    username = request.session.get("wiki_username")
+    wiki_code = request.session.get("wiki_code", "fi")
 
     if not username:
         # Return public user permissions
