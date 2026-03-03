@@ -107,6 +107,7 @@ def run_autoreview_for_page(
             reviews are submitted).
     """
     from bot_control.models import BotActivity
+
     from reviews.models import EditorProfile
     from reviews.services import FlaggedRevsClient, WikiClient
 
@@ -207,8 +208,144 @@ def run_autoreview_for_page(
                     execution_time_ms=revision_result["total_duration_ms"],
                     is_dry_run=dry_run,
                 )
-            except Exception:
+            except Exception:  # noqa: S110
                 # Don't let logging failures break the autoreview
                 pass
 
     return results
+
+
+def review_single_revision(
+    revid: int,
+    wiki_code: str,
+    *,
+    log_activity: bool = True,
+    dry_run: bool = True,
+) -> dict:
+    """Review a single revision by its revision ID.
+
+    This is the main entrypoint for reviewing one specific revision.  It
+    loads the revision from the database, runs the full check pipeline,
+    optionally submits the review via the FlaggedRevs API, and logs the
+    result to :class:`~bot_control.models.BotActivity`.
+
+    Args:
+        revid: The MediaWiki revision ID to review.
+        wiki_code: The wiki code (e.g. ``"fi"``) that owns the revision.
+        log_activity: Whether to write a BotActivity record.
+        dry_run: When *False* and the decision is ``"approve"``, actually
+            submit the review.  Defaults to *True* (no real reviews).
+
+    Returns:
+        A dict with keys ``revid``, ``tests``, ``decision``, ``mode``,
+        ``review_submitted``, ``review_message``, and
+        ``total_duration_ms``.
+
+    Raises:
+        ValueError: If the revision or its wiki cannot be found in the DB.
+    """
+    from bot_control.models import BotActivity
+
+    from reviews.models import EditorProfile, PendingRevision, Wiki
+    from reviews.services import FlaggedRevsClient, WikiClient
+
+    try:
+        wiki = Wiki.objects.get(code=wiki_code)
+    except Wiki.DoesNotExist:
+        raise ValueError(f"Wiki with code '{wiki_code}' not found.")
+
+    revision = (
+        PendingRevision.objects.select_related("page", "page__wiki")
+        .filter(page__wiki=wiki, revid=revid)
+        .first()
+    )
+    if revision is None:
+        raise ValueError(f"Revision {revid} not found in the database for wiki '{wiki_code}'.")
+
+    page = revision.page
+    profile = (
+        EditorProfile.objects.filter(wiki=wiki, username=revision.user_name).first()
+        if revision.user_name
+        else None
+    )
+
+    configuration = wiki.configuration
+    auto_groups = normalize_to_lookup(configuration.auto_approved_groups)
+    blocking_categories = normalize_to_lookup(configuration.blocking_categories)
+    redirect_aliases = get_redirect_aliases(wiki)
+    client = WikiClient(wiki)
+
+    revision_result = run_checks_pipeline(
+        revision,
+        client,
+        profile,
+        auto_groups=auto_groups,
+        blocking_categories=blocking_categories,
+        redirect_aliases=redirect_aliases,
+    )
+    decision_status = revision_result["decision"].status
+
+    # Submit review if approved and not dry-run
+    review_submitted = False
+    review_message = ""
+    if decision_status == "approve" and not dry_run:
+        try:
+            fr_client = FlaggedRevsClient(client.site)
+            review_result = fr_client.review_revision(
+                revid=revision.revid,
+                comment="Auto-approved by PendingChangesBot",
+            )
+            review_submitted = review_result.success
+            review_message = review_result.message
+            if not review_result.success:
+                logger.warning(
+                    "FlaggedRevs review failed for rev %s: %s",
+                    revision.revid,
+                    review_result.message,
+                )
+        except Exception:
+            logger.exception(
+                "Failed to submit FlaggedRevs review for rev %s",
+                revision.revid,
+            )
+
+    result_data = {
+        "revid": revision.revid,
+        "tests": revision_result["tests"],
+        "decision": {
+            "status": decision_status,
+            "label": revision_result["decision"].label,
+            "reason": revision_result["decision"].reason,
+        },
+        "total_duration_ms": revision_result["total_duration_ms"],
+        "mode": "dry-run" if dry_run else "live",
+        "review_submitted": review_submitted,
+        "review_message": review_message,
+    }
+
+    if log_activity:
+        try:
+            determining_check = ""
+            for test in revision_result["tests"]:
+                if test.get("decision"):
+                    determining_check = test.get("id", "")
+                    break
+
+            BotActivity.log_activity(
+                wiki_code=wiki.code,
+                page_id=page.pageid,
+                page_title=page.title,
+                revision_id=revision.revid,
+                user_name=revision.user_name or "",
+                decision=decision_status,
+                decision_label=revision_result["decision"].label,
+                decision_reason=revision_result["decision"].reason,
+                determining_check=determining_check,
+                total_checks_run=len(revision_result["tests"]),
+                execution_time_ms=revision_result["total_duration_ms"],
+                is_dry_run=dry_run,
+            )
+        except Exception:  # noqa: S110
+            pass
+
+    return result_data

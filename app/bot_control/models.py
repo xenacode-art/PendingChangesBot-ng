@@ -96,3 +96,31 @@ class BotActivity(models.Model):
             execution_time_ms=execution_time_ms,
             is_dry_run=is_dry_run,
         )
+
+
+class AuditLog(models.Model):
+    """Tracks all HTTP requests to the server for public transparency."""
+
+    timestamp = models.DateTimeField(default=timezone.now, db_index=True)
+    method = models.CharField(max_length=10)
+    path = models.CharField(max_length=2048)
+    status_code = models.IntegerField()
+    username = models.CharField(max_length=255, default="anonymous")
+    role = models.CharField(max_length=20, default="public")
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    query_params = models.TextField(blank=True)
+    response_time_ms = models.FloatField(null=True, blank=True)
+
+    class Meta:
+        db_table = "audit_log"
+        ordering = ["-timestamp"]
+        indexes = [
+            models.Index(fields=["-timestamp"]),
+            models.Index(fields=["method"]),
+            models.Index(fields=["status_code"]),
+            models.Index(fields=["username", "-timestamp"]),
+            models.Index(fields=["path", "-timestamp"]),
+        ]
+
+    def __str__(self):
+        return f"[{self.timestamp}] {self.method} {self.path} → {self.status_code}"
