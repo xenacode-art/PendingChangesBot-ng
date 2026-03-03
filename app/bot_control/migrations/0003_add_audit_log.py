@@ -53,9 +53,6 @@ class Migration(migrations.Migration):
                         fields=["username", "-timestamp"],
                         name="audit_log_usernam_cd96e7_idx",
                     ),
-                    models.Index(
-                        fields=["path", "-timestamp"], name="audit_log_path_5924d8_idx"
-                    ),
                 ],
             },
         ),

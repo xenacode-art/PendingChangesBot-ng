@@ -119,7 +119,6 @@ class AuditLog(models.Model):
             models.Index(fields=["method"]),
             models.Index(fields=["status_code"]),
             models.Index(fields=["username", "-timestamp"]),
-            models.Index(fields=["path", "-timestamp"]),
         ]
 
     def __str__(self):
