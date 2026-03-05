@@ -281,7 +281,7 @@ SELECT
     r.rev_id         AS pending_revision_id,
     l.log_timestamp  AS reviewed_timestamp,
     r.rev_timestamp  AS pending_timestamp,
-    TIMESTAMPDIFF(DAY, r.rev_timestamp, l.log_timestamp) AS review_delay_days
+    GREATEST(0, TIMESTAMPDIFF(DAY, CAST(r.rev_timestamp AS DATETIME), CAST(l.log_timestamp AS DATETIME))) AS review_delay_days
 FROM (
     SELECT
         log_id,

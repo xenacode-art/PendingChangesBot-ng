@@ -154,7 +154,7 @@ SELECT
    group_concat(DISTINCT(ctd_name)) AS change_tags,
    group_concat(DISTINCT(ug_group)) AS user_groups,
    group_concat(DISTINCT(ufg_group)) AS user_former_groups,
-   group_concat(DISTINCT(cl_to)) AS page_categories,
+   group_concat(DISTINCT(cat.cat_title)) AS page_categories,
    rc_bot,
    rc_patrolled,
    pp_value as wikibase_item
@@ -169,6 +169,7 @@ FROM
    ,
    page AS p
        LEFT JOIN categorylinks ON cl_from = page_id
+       LEFT JOIN category AS cat ON cat.cat_id = categorylinks.cl_target_id
        LEFT JOIN page_props ON pp_page = page_id AND pp_propname="wikibase_item",
    comment_revision,
    actor_revision AS a

@@ -318,22 +318,22 @@ def api_statistics_charts(request: HttpRequest, pk: int) -> JsonResponse:
     ]
 
     average_delay_over_time = [
-        {"date": date, "avg_delay": sum(delays) / len(delays) if delays else 0}
+        {"date": date, "avg_delay": sum(d for d in delays if d >= 0) / max(1, sum(1 for d in delays if d >= 0))}
         for date, delays in sorted(delays_by_date.items())
     ]
 
     delay_percentiles = [
         {
             "date": date,
-            "p10": calculate_percentile(delays, 10),
-            "p50": calculate_percentile(delays, 50),
-            "p90": calculate_percentile(delays, 90),
+            "p10": calculate_percentile([d for d in delays if d >= 0], 10),
+            "p50": calculate_percentile([d for d in delays if d >= 0], 50),
+            "p90": calculate_percentile([d for d in delays if d >= 0], 90),
         }
         for date, delays in sorted(delays_by_date.items())
     ]
 
-    # Calculate overall statistics
-    all_delays = [delay for delays in delays_by_date.values() for delay in delays]
+    # Calculate overall statistics (exclude negative delays from bad legacy data)
+    all_delays = [delay for delays in delays_by_date.values() for delay in delays if delay >= 0]
     overall_stats = {
         "avg_delay": sum(all_delays) / len(all_delays) if all_delays else 0,
         "p10": calculate_percentile(all_delays, 10),
