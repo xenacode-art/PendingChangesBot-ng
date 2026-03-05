@@ -147,6 +147,7 @@ SELECT
    rev_len,
    rev_parent_id,
    rev_deleted,
+   content_sha1 as rev_sha1,
    comment_text,
    a.actor_name,
    a.actor_user,
@@ -173,7 +174,9 @@ FROM
    comment_revision,
    actor_revision AS a
    LEFT JOIN user_groups ON a.actor_user=ug_user
-   LEFT JOIN user_former_groups ON a.actor_user=ufg_user
+   LEFT JOIN user_former_groups ON a.actor_user=ufg_user,
+   slots,
+   content
 WHERE
    fp_pending_since IS NOT NULL
    AND r.rev_page=fp_page_id
@@ -182,6 +185,8 @@ WHERE
    AND r.rev_id>=fp_stable
    AND r.rev_actor=a.actor_id
    AND r.rev_comment_id=comment_id
+   AND slot_revision_id=r.rev_id
+   AND slot_content_id=content_id
 GROUP BY r.rev_id
 ORDER BY fp_pending_since, rev_id DESC
 """
