@@ -182,8 +182,7 @@ CSP_SCRIPT_SRC = (
     "'self'",
     "'unsafe-inline'",
     "'unsafe-eval'",  # Required for Vue.js
-    "https://unpkg.com",
-    "https://cdn.jsdelivr.net",
+    "https://tools-static.wmflabs.org",
     "*.toolforge.org",
     "*.wikimedia.org",
     "*.wikipedia.org",
@@ -191,7 +190,7 @@ CSP_SCRIPT_SRC = (
 CSP_STYLE_SRC = (
     "'self'",
     "'unsafe-inline'",
-    "https://cdnjs.cloudflare.com",
+    "https://tools-static.wmflabs.org",
     "*.toolforge.org",
     "*.wikimedia.org",
     "*.wikipedia.org",
@@ -203,7 +202,7 @@ CSP_CONNECT_SRC = (
     "*.wikipedia.org",
 )
 CSP_IMG_SRC = ("'self'", "data:", "https:", "*.wikimedia.org", "*.wikipedia.org")
-CSP_FONT_SRC = ("'self'", "data:", "https://cdnjs.cloudflare.com")
+CSP_FONT_SRC = ("'self'", "data:", "https://tools-static.wmflabs.org")
 
 PYWIKIBOT_SITE_FAMILY = os.getenv("PYWIKIBOT_SITE_FAMILY", "wikipedia")
 
