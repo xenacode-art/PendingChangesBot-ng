@@ -147,7 +147,6 @@ SELECT
    rev_len,
    rev_parent_id,
    rev_deleted,
-   rev_sha1,
    comment_text,
    a.actor_name,
    a.actor_user,
